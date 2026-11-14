@@ -1,0 +1,16 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+httpx>=0.27
+psutil>=5.9
+python-docx>=1.1
+openpyxl>=3.1
+python-pptx>=0.6.23
+pymupdf>=1.24
+beautifulsoup4>=4.12
+cryptography>=42
+numpy>=1.26
+pandas>=2.1
+matplotlib>=3.8
+pillow>=10.0
+rapidocr-onnxruntime>=1.3
