@@ -130,7 +130,9 @@ def _wanted_output(cmd: str) -> str:
 async def create_task(command: str, agent_id: str | None = None) -> dict:
     tid = uuid.uuid4().hex[:10]
     title = command.strip().split("\n")[0][:80]
-    proj = workspace() / f"{time.strftime('%Y%m%d_%H%M')}_{re.sub(r'[^\w]+', '_', title)[:40]}_{tid[:4]}"
+    safe_title = re.sub(r"[^\w]+", "_", title)[:40]
+    stamp = time.strftime("%Y%m%d_%H%M")
+    proj = workspace() / f"{stamp}_{safe_title}_{tid[:4]}"
     t = {"id": tid, "title": title, "command": command.strip(), "status": "plan_hazirlaniyor", "progress": 0,
          "plan": None, "result": None, "files": [], "errors": [], "lead_agent": agent_id or "ceo",
          "agents": [], "project_dir": str(proj), "direct": 1 if agent_id else 0,

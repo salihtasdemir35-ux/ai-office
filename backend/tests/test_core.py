@@ -80,14 +80,38 @@ async def _emb(req: Request):
     return {"data": data}
 
 
+def _free_port() -> int:
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+PORT = int(os.environ.get("AI_OFFICE_TEST_PORT") or _free_port())
+os.environ["AI_OFFICE_TEST_PORT"] = str(PORT)  # modül ikinci kez yüklenirse aynı sunucuyu kullan
+
+
 def _serve():
-    uvicorn.run(fake, host="127.0.0.1", port=18999, log_level="error")
+    uvicorn.run(fake, host="127.0.0.1", port=PORT, log_level="error")
 
 
-threading.Thread(target=_serve, daemon=True).start()
-time.sleep(1.5)
-os.environ["AI_OFFICE_LLM_URL"] = "http://127.0.0.1:18999"
-os.environ["AI_OFFICE_EMBED_URL"] = "http://127.0.0.1:18999"
+def _port_open() -> bool:
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", PORT), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+if not _port_open():
+    threading.Thread(target=_serve, daemon=True).start()
+    for _ in range(50):
+        if _port_open():
+            break
+        time.sleep(0.1)
+os.environ["AI_OFFICE_LLM_URL"] = f"http://127.0.0.1:{PORT}"
+os.environ["AI_OFFICE_EMBED_URL"] = f"http://127.0.0.1:{PORT}"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

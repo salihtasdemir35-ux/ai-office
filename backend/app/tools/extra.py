@@ -130,7 +130,8 @@ async def analyze_data(ctx: ToolContext, yol: str) -> str:
 async def make_chart(ctx: ToolContext, yol: str, x: str = "", y: str = "", tur: str = "bar", baslik: str = "") -> str:
     p = resolve_path(yol, must_exist=True)
     df = await asyncio.to_thread(_load_df, p)
-    out = _out_path(ctx, f"grafik_{re.sub(r'[^\w]+', '_', baslik or p.stem)[:30]}.png", ".png")
+    safe = re.sub(r"[^\w]+", "_", baslik or p.stem)[:30]
+    out = _out_path(ctx, f"grafik_{safe}.png", ".png")
 
     def draw():
         import matplotlib
@@ -286,7 +287,8 @@ async def send_email(ctx: ToolContext, alici: str, konu: str, icerik: str, ek: s
     if ek:
         ap = resolve_path(ek, must_exist=True)
         msg.add_attachment(ap.read_bytes(), maintype="application", subtype="octet-stream", filename=ap.name)
-    draft = _out_path(ctx, f"eposta_{re.sub(r'[^\w]+', '_', konu)[:30]}.eml", ".eml")
+    safe = re.sub(r"[^\w]+", "_", konu)[:30]
+    draft = _out_path(ctx, f"eposta_{safe}.eml", ".eml")
     draft.write_bytes(bytes(msg))
     ctx.created_files.append(str(draft))
     if not s.get("host"):
