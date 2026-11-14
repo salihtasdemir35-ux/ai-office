@@ -1,0 +1,86 @@
+name: AI OFFICE Windows tasinabilir paket
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Pakete eklenecek model (none = model ilk acilista indirilir)"
+        type: choice
+        default: none
+        options: [none, qwen2.5-1.5b, qwen2.5-3b]
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Paket ici Python ve bagimliliklar
+        shell: pwsh
+        run: ./installer/prepare_runtime.ps1 -Root "$env:GITHUB_WORKSPACE"
+
+      - name: llama.cpp motoru (Vulkan + CPU) ve istege bagli model
+        shell: pwsh
+        env:
+          MODEL: ${{ github.event.inputs.model || 'none' }}
+          PYTHONUTF8: "1"
+        run: |
+          $py = "runtime/python/python.exe"
+          & $py -c "import asyncio,sys; sys.path.insert(0,'backend'); from app import model_manager as mm; print(asyncio.run(mm.download_engine()))"
+          if ($env:MODEL -ne "none") { & $py backend/cli.py prepare --model $env:MODEL --location usb }
+
+      - name: Tarayici otomasyonu (Playwright Chromium, pakete dahil)
+        shell: pwsh
+        env: { PLAYWRIGHT_BROWSERS_PATH: "${{ github.workspace }}\\dependencies\\ms-playwright" }
+        run: |
+          runtime/python/python.exe -m pip install playwright --no-warn-script-location
+          runtime/python/python.exe -m playwright install chromium
+
+      - name: Testler
+        shell: pwsh
+        env: { PYTHONUTF8: "1" }
+        run: |
+          runtime/python/python.exe -m pip install pytest --no-warn-script-location
+          runtime/python/python.exe -m pytest -q backend/tests
+
+      - name: AI_OFFICE.exe baslatici
+        shell: pwsh
+        run: |
+          runtime/python/python.exe -m pip install pyinstaller --no-warn-script-location
+          runtime/python/python.exe -m PyInstaller --onefile --noconsole --name AI_OFFICE --distpath . launcher.py
+          Remove-Item -Recurse -Force build, AI_OFFICE.spec -ErrorAction SilentlyContinue
+
+      - name: Paketi hazirla
+        shell: pwsh
+        run: |
+          $out = "AI_OFFICE_PORTABLE"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $items = "AI_OFFICE.exe","START_AI_OFFICE.bat","INSTALL_AI_OFFICE.bat","UPDATE_AI_OFFICE.bat","BACKUP_AI_OFFICE.bat","RESTORE_AI_OFFICE.bat","SAFE_EXIT_AI_OFFICE.bat","PORTABLE_MODE.json","README.txt","backend","frontend","installer","engines","models","runtime"
+          foreach ($i in $items) { if (Test-Path $i) { Copy-Item -Recurse -Force $i $out } }
+          Get-ChildItem $out -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+          foreach ($d in "agent_profiles","models","memory","knowledge_base","projects","workspace","database","logs","config","backups","cache","exports","dependencies","tools") { New-Item -ItemType Directory -Force "$out/$d" | Out-Null }
+          if (Test-Path dependencies/ms-playwright) { Copy-Item -Recurse -Force dependencies/ms-playwright "$out/dependencies/" }
+
+      - name: Windows kurulum paketi (Inno Setup, yonetici yetkisi gerektirmez)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          New-Item -ItemType Directory -Force stage | Out-Null
+          Copy-Item -Recurse -Force AI_OFFICE_PORTABLE\* stage\
+          Remove-Item -Force stage\PORTABLE_MODE.json -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force stage\models\*.gguf -ErrorAction SilentlyContinue
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\ai_office.iss
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI_OFFICE_PORTABLE_windows
+          path: AI_OFFICE_PORTABLE
+          compression-level: 6
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI_OFFICE_Setup_windows
+          path: dist/AI_OFFICE_Setup.exe
