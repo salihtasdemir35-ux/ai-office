@@ -115,7 +115,7 @@ def public_task(t: dict) -> dict:
 
 
 def _team_text() -> str:
-    return "\n".join(f"- {a['id']}: {a['title']} — {a['expertise']}" for a in registry.hired() if a["id"] != "ceo")
+    return "\n".join(f"- {a['id']}: {a['name']} ({a['title']}) — {a['expertise']}" for a in registry.hired() if a["id"] != "ceo")
 
 
 def _wanted_output(cmd: str) -> str:
@@ -166,11 +166,13 @@ EKİBİN (sadece bu id'leri kullan):
 {team or '- (ekip yok, adımları kendin yap: ceo)'}
 KURALLAR:
 - En fazla {s['max_steps']} adım. Gereksiz adım ekleme. Her adım tek bir ajana verilir.
+- Aynı uzmanlıktan birden fazla ajan varsa (ör. internet_arastirmaci ve internet_arastirmaci__2) işi aralarında bölüştür (farklı alt konular).
 - Belge isteniyorsa SON adım ilgili belge uzmanına verilsin ve "cikti" alanı docx/xlsx/pptx/pdf olsun.
 - Kalite kontrol uzmanı ekipte varsa planın sonunda değil, sistem onu otomatik çağırır.
 - SADECE şu JSON'u döndür:
 {{"ozet":"planın 1-2 cümlelik özeti","adimlar":[{{"ajan":"ajan_id","baslik":"kısa başlık","talimat":"ajanın yapacağı işin net tarifi","cikti":"metin|docx|xlsx|pptx|pdf"}}]}}"""
-    user = f"KOMUT: {t['command']}" + (f"\n\nİLGİLİ GEÇMİŞ BİLGİLER (doğrulanmamış):\n{mem}" if mem else "")
+    from .websources import prompt_block
+    user = f"KOMUT: {t['command']}" + (f"\n\nİLGİLİ GEÇMİŞ BİLGİLER (doğrulanmamış):\n{mem}" if mem else "") + prompt_block()
     try:
         plan = None
         raw = ""
@@ -423,6 +425,9 @@ async def run_agent_step(t: dict, st: dict, context: str) -> tuple[str, ToolCont
             f"ÇIKTI KLASÖRÜ: {t['project_dir']}\n\nÖNCEKİ ADIMLARIN ÇIKTILARI:\n{context}")
     if mem:
         user += f"\n\nİLGİLİ HAFIZA (doğrulanmamış, eski olabilir):\n{mem}"
+    if set(tools) & {"web_search", "web_fetch", "browser_open", "kb_search", "download_file"}:
+        from .websources import prompt_block
+        user += prompt_block()
     history = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user}]
     await bus.set_agent(aid, "Düşünüyor", f"{st['baslik']} üzerinde çalışıyorum.", task_id=tid)
     for i in range(iters + 1):

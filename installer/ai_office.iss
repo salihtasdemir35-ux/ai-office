@@ -1,6 +1,6 @@
 ; AI OFFICE - Windows kurulum paketi (Inno Setup 6)
 ; Yonetici yetkisi GEREKTIRMEZ: kullanici klasorune (%LOCALAPPDATA%\AI_OFFICE\app) kurulur.
-#define AppVer "1.0.0"
+#define AppVer "1.1.0"
 
 [Setup]
 AppId={{6C1F3A52-7E1B-4C0B-9A2E-AI0FF1CE0001}

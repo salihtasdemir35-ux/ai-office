@@ -81,6 +81,7 @@ const App = {
       Views.onMessage?.(m.message);
     });
     WS.on("task", (m) => Views.onTask?.(m.task));
+    WS.on("agents_changed", async () => { await this.loadAgents(); if (["office", "home"].includes(this.view)) this.refresh(); });
     WS.on("engine", (m) => this.updateBadges(m.engine));
     WS.on("resources", (m) => {
       const r = m.resources;

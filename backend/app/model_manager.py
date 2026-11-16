@@ -20,7 +20,8 @@ from .paths import DIRS, local_appdata
 CATALOG: dict = json.loads((Path(__file__).parent / "data" / "models_catalog.json").read_text(encoding="utf-8"))
 TIER_LABELS = {"cok_dusuk": "Düşük donanım (çok zayıf)", "dusuk": "Düşük donanım",
                "dengeli": "Dengeli performans", "yuksek": "Yüksek performans"}
-LLAMA_RELEASE_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+LLAMA_RELEASES_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=40"
+LLAMA_RELEASES_PAGE = "https://github.com/ggml-org/llama.cpp/releases"
 
 jobs: dict[str, dict] = {}
 
@@ -197,7 +198,7 @@ def start_model_download(model_id: str, location: str) -> dict:
 ENGINE_INFO = DIRS["engines"] / "engine_info.json"
 VARIANT_PATTERNS = {
     "vulkan": [r"bin-win-vulkan-x64\.zip$"],
-    "cpu": [r"bin-win-cpu-x64\.zip$", r"bin-win-avx2-x64\.zip$"],
+    "cpu": [r"bin-win-cpu-x64\.zip$", r"bin-win-avx2-x64\.zip$", r"bin-win-noavx-x64\.zip$"],
 }
 
 
@@ -219,6 +220,11 @@ def find_server(variant: str) -> Path | None:
     if d.exists():
         for p in d.rglob(exe):
             return p
+    # Kullanıcının elle engines klasörüne koyduğu herhangi bir llama.cpp
+    for p in DIRS["engines"].rglob(exe):
+        low = str(p).lower()
+        if variant in low or (variant == "cpu" and "vulkan" not in low and "cuda" not in low):
+            return p
     if variant == "cpu" and os.name != "nt":
         w = shutil.which("llama-server")
         if w:
@@ -226,37 +232,96 @@ def find_server(variant: str) -> Path | None:
     return None
 
 
-async def download_engine(variants: tuple[str, ...] = ("vulkan", "cpu"), job: dict | None = None) -> dict:
-    job = job or _job("engine", "llama.cpp yerel AI motoru")
-    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as c:
-        r = await c.get(LLAMA_RELEASE_API, headers={"Accept": "application/vnd.github+json"})
-        r.raise_for_status()
-        rel = r.json()
+def _variant_of(name: str) -> str | None:
+    for variant, pats in VARIANT_PATTERNS.items():
+        if any(re.search(p, name) for p in pats):
+            return variant
+    return None
+
+
+def _extract_engine(zpath: Path, variant: str, tag: str) -> dict:
+    out = DIRS["engines"] / f"llama_{variant}"
+    out.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zpath) as z:
+        for m in z.infolist():
+            target = (out / m.filename).resolve()
+            if out.resolve() in target.parents or target == out.resolve():
+                z.extract(m, out)
+    exe = next(out.rglob("llama-server.exe"), None) or next(out.rglob("llama-server"), None)
+    if not exe:
+        raise RuntimeError(f"{zpath.name} içinde llama-server.exe bulunamadı.")
     info = engine_info()
-    for variant in variants:
-        if find_server(variant):
-            continue
-        asset = None
-        for pat in VARIANT_PATTERNS[variant]:
-            asset = next((a for a in rel.get("assets", []) if re.search(pat, a["name"])), None)
-            if asset:
-                break
-        if not asset:
-            raise RuntimeError(f"llama.cpp sürümünde {variant} paketi bulunamadı.")
-        zpath = DIRS["cache"] / asset["name"]
-        job["label"] = f"llama.cpp ({variant}) {rel.get('tag_name')}"
-        await download_file(asset["browser_download_url"], zpath, _progress_cb(job), job["cancel"])
-        out = DIRS["engines"] / f"llama_{variant}"
-        out.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(zpath) as z:
-            z.extractall(out)
-        exe = next(out.rglob("llama-server.exe"), None)
-        if not exe:
-            raise RuntimeError("Arşivde llama-server.exe bulunamadı.")
-        info[variant] = {"dir": str(exe.parent.relative_to(DIRS["engines"])), "tag": rel.get("tag_name")}
-        ENGINE_INFO.write_text(json.dumps(info, indent=2), encoding="utf-8")
-        zpath.unlink(missing_ok=True)
+    info[variant] = {"dir": str(exe.parent.relative_to(DIRS["engines"])), "tag": tag}
+    ENGINE_INFO.write_text(json.dumps(info, indent=2), encoding="utf-8")
     return info
+
+
+def pick_asset(releases: list[dict], variant: str) -> tuple[dict | None, str | None]:
+    """Windows paketi bulunan en yeni sürümü seçer ('latest' sürümde paket olmayabilir)."""
+    for rel in releases:
+        if rel.get("draft"):
+            continue
+        for a in rel.get("assets", []):
+            if _variant_of(a["name"]) == variant:
+                return a, rel.get("tag_name")
+    return None, None
+
+
+def import_local_engines() -> list[str]:
+    """İnternetten inemediyse: kullanıcının indirdiği llama.cpp ZIP'lerini engines, cache ve İndirilenler
+    klasörlerinde bulup otomatik kurar (llama-bNNNN-bin-win-vulkan-x64.zip / ...-cpu-x64.zip)."""
+    found = []
+    dirs = [DIRS["engines"], DIRS["cache"], Path.home() / "Downloads", Path.home() / "İndirilenler"]
+    for d in dirs:
+        if not d.exists():
+            continue
+        for z in sorted(d.glob("llama-*bin-win-*.zip"), key=lambda p: p.stat().st_mtime, reverse=True):
+            variant = _variant_of(z.name)
+            if not variant or find_server(variant) or variant in found:
+                continue
+            try:
+                _extract_engine(z, variant, z.name.split("-bin-")[0].replace("llama-", ""))
+                found.append(variant)
+            except Exception:
+                continue
+    return found
+
+
+async def download_engine(variants: tuple[str, ...] = ("vulkan", "cpu"), job: dict | None = None) -> dict:
+    """llama.cpp hem sürüm numaralı (v0.x) hem derleme (bNNNNN) sürümleri yayınlar; 'latest' sürümde Windows
+    paketleri olmayabilir. Bu yüzden son 40 sürüm taranır ve paketi OLAN en yeni sürüm seçilir."""
+    job = job or _job("engine", "llama.cpp yerel AI motoru")
+    import_local_engines()
+    need = [v for v in variants if not find_server(v)]
+    if not need:
+        return engine_info()
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as c:
+            r = await c.get(LLAMA_RELEASES_API, headers={"Accept": "application/vnd.github+json",
+                                                         "User-Agent": "AI-OFFICE"})
+            if r.status_code == 403:
+                raise RuntimeError("GitHub geçici indirme sınırı (saatte 60 istek) doldu; 1 saat sonra tekrar deneyin.")
+            r.raise_for_status()
+            releases = r.json()
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"GitHub'a ulaşılamadı ({type(e).__name__}).") from e
+    errors = []
+    for variant in need:
+        asset, tag = pick_asset(releases, variant)
+        if not asset:
+            errors.append(variant)
+            continue
+        zpath = DIRS["cache"] / asset["name"]
+        job["label"] = f"llama.cpp ({variant}) {tag}"
+        await download_file(asset["browser_download_url"], zpath, _progress_cb(job), job["cancel"])
+        _extract_engine(zpath, variant, tag)
+        zpath.unlink(missing_ok=True)
+    if errors and not (find_server("vulkan") or find_server("cpu")):
+        raise RuntimeError(
+            f"Son sürümlerde Windows paketi bulunamadı ({', '.join(errors)}). Elle kurulum: {LLAMA_RELEASES_PAGE} "
+            "adresinden 'llama-…-bin-win-vulkan-x64.zip' (ekran kartı) ve 'llama-…-bin-win-cpu-x64.zip' dosyalarını "
+            "indirip İndirilenler klasöründe bırakın, sonra 'Klasörleri tara' düğmesine basın.")
+    return engine_info()
 
 
 def start_engine_download() -> dict:

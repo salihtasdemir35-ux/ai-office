@@ -1,5 +1,5 @@
 =====================================================================
-  AI OFFICE – Autonomous AI Workforce            (sürüm 1.0 – 7 aşamanın tamamı)
+  AI OFFICE – Autonomous AI Workforce            (sürüm 1.1)
   "Ofisini kur. Yapay zekâ çalışanlarını seç. İşlerini yönet."
 =====================================================================
 
@@ -47,6 +47,13 @@ Anlamsal arama modeli (bge-m3, 438 MB, MIT, çok dilli) da paketlemede otomatik 
 - Görev kuyruğu, GPU/CPU/RAM/disk izleme, RAM'e sığmayan modeli otomatik küçültme
 - Yedekleme (şifreli), USB veri kasası, bilgisayarlar arası senkronizasyon (çakışma ekranı),
   model taşıma/silme, "Bilgisayara kur" (kısayollu), Inno Setup kurulum paketi (GitHub Actions)
+
+YENİ (1.1)
+- Ajan adlarını ve her uzmanlıktan kaç kişi çalışacağını siz belirlersiniz (Kurulum > Ekip, Ajanlarım, Ajan Marketi).
+- Bilgi Bankası > İnternet kaynaklarım: ajanların önce bakacağı siteler; istenirse içerik (alt sayfalarla) indirilip
+  internetsiz aranabilir hale getirilir.
+- Motor indirme düzeltildi: llama.cpp'nin Windows paketi olan en yeni sürümü bulunur. İnemezse elle indirilen ZIP
+  İndirilenler klasöründe "Klasörleri tara" ile otomatik kurulur.
 
 ---------------------------------------------------------------------
 USB / TAŞINABİLİR MOD

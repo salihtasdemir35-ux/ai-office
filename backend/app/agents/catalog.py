@@ -132,6 +132,8 @@ def system_prompt(name: str, title: str, expertise: str, duty: str) -> str:
 def builtin_agents() -> list[dict]:
     out = []
     for (aid, name, title, cat, dept, avatar, color, exp, duty, tools, perm) in _RAW:
+        if ("web_search" in tools or "web_fetch" in tools) and "kb_search" not in tools:
+            tools = list(tools) + ["kb_search"]  # kullanıcının bilgi bankasına eklediği internet kaynakları
         out.append({
             "id": aid, "name": name, "title": title, "category": cat, "department": dept,
             "avatar": avatar, "color": color, "expertise": exp, "duty": duty,

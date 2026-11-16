@@ -66,6 +66,16 @@ async def wiki_search(query: str, n: int = 5, lang: str = "tr") -> list[dict]:
 async def web_search(ctx: ToolContext, sorgu: str) -> str:
     _check()
     results, note = [], ""
+    # 1) Kullanıcının öncelikli kaynakları (Bilgi Bankası > İnternet kaynakları)
+    from ..websources import priority_sources
+    prio = []
+    for src in priority_sources()[:3]:
+        try:
+            for r in await ddg_search(f"{sorgu} site:{src['domain']}", n=3):
+                r["title"] = f"[Öncelikli kaynak: {src['title']}] {r['title']}"
+                prio.append(r)
+        except Exception:
+            continue
     try:
         results = await ddg_search(sorgu)
     except Exception as e:  # noqa
@@ -75,6 +85,8 @@ async def web_search(ctx: ToolContext, sorgu: str) -> str:
             results = await wiki_search(sorgu)
         except Exception as e:  # noqa
             return f"Arama başarısız: {e}"
+    seen = {r["url"] for r in prio}
+    results = prio + [r for r in results if r["url"] not in seen]
     for r in results:
         ctx.sources.append(r["url"])
     lines = [f"{i}. {r['title']}\n   {r['url']}\n   {r['snippet'][:250]}" for i, r in enumerate(results, 1)]

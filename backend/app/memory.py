@@ -113,24 +113,29 @@ def kb_add(path: Path) -> dict:
     from .tools.documents import extract_text
     if path.suffix.lower() not in KB_EXT:
         raise ValueError(f"Desteklenmeyen tür: {path.suffix}")
-    text = extract_text(path)
-    chunks = _chunks(text)
-    old = db.one("SELECT id FROM kb_docs WHERE path=?", (str(path),))
+    return kb_add_text(str(path), path.name, extract_text(path), path.stat().st_mtime)
+
+
+def kb_add_text(key: str, title: str, text: str, mtime: float | None = None) -> dict:
+    """Bilgi bankasına metin ekler (dosya yolu veya web adresi anahtar olarak kullanılır)."""
+    chunks = _chunks(text) or [""]
+    old = db.one("SELECT id FROM kb_docs WHERE path=?", (key,))
     if old:
         db.execute("DELETE FROM kb_vec WHERE doc_id=?", (old["id"],))
         db.execute("DELETE FROM kb_fts WHERE doc_id=?", (old["id"],))
         db.execute("DELETE FROM kb_docs WHERE id=?", (old["id"],))
     did = db.execute("INSERT INTO kb_docs(path,title,mtime,chunks,added) VALUES(?,?,?,?,?)",
-                     (str(path), path.name, path.stat().st_mtime, len(chunks), time.time()))
+                     (key, title[:200], mtime or time.time(), len(chunks), time.time()))
     for i, ch in enumerate(chunks):
         db.execute("INSERT INTO kb_fts(content, doc_id, chunk_no) VALUES(?,?,?)", (ch, did, i))
-    return {"id": did, "title": path.name, "chunks": len(chunks)}
+    _invalidate()
+    return {"id": did, "title": title, "chunks": len(chunks)}
 
 
 def kb_refresh() -> list[dict]:
     """Güncelleme kontrolü: değişen dosyaları yeniden indeksler."""
     changed = []
-    for d in db.query("SELECT * FROM kb_docs"):
+    for d in db.query("SELECT * FROM kb_docs WHERE path NOT LIKE 'http%'"):
         p = Path(d["path"])
         if p.exists() and p.stat().st_mtime > (d["mtime"] or 0) + 1:
             changed.append(kb_add(p))

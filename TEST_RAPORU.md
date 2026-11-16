@@ -1,6 +1,6 @@
-# AI OFFICE 1.0 – Tüm Aşamalar Test Raporu (14.11.2026)
+# AI OFFICE 1.1 – Test Raporu (14.11.2026)
 
-## Otomatik testler: 29/29 başarılı (`runtime\python\python.exe -m pytest backend/tests`)
+## Otomatik testler: 34/34 başarılı (Python 3.11 ve 3.13) (`runtime\python\python.exe -m pytest backend/tests`)
 Orkestratör ve embedding testleri için YALNIZCA TESTTE OpenAI uyumlu sahte yerel sunucu kullanılır; uygulamada sahte yanıt yoktur.
 
 | Aşama | Test | Sonuç |
@@ -23,6 +23,9 @@ Orkestratör ve embedding testleri için YALNIZCA TESTTE OpenAI uyumlu sahte yer
 | 7 | Taşıma işleminde kullanıcı reddi → dosyaya dokunulmaz | ✅ |
 | 7 | Zip-slip saldırılı yedek → kök dışına dosya yazılamaz | ✅ |
 | 7 | Prompt injection koruması: araç/web sonuçları "güvenilmeyen veri" etiketiyle modele gider | ✅ |
+| 1.1 | Motor: Windows paketi olmayan 'latest' sürüm atlanır; elle indirilen ZIP otomatik kurulur | ✅ |
+| 1.1 | Ajan kişi sayısı (3 internet araştırmacısı, adlarıyla), yeniden adlandırma, tek CEO, CEO ekip listesinde adlar | ✅ |
+| 1.1 | İnternet kaynakları: alt sayfalarla indirme, bilgi bankasında arama, öncelikli kaynakların CEO/ajan talimatına eklenmesi, yerel adres engeli | ✅ |
 | 7 | Kaynak izleme (CPU/RAM/disk/GPU alanı), embedding durumu | ✅ |
 
 ## Arayüz testi (headless Chrome)

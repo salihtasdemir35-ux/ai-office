@@ -138,11 +138,30 @@ const Views = {
   async agents(el) {
     await App.loadAgents();
     const hired = App.agents.filter((a) => a.hired);
-    el.innerHTML = `<div class="card"><h2>Ofisteki çalışanlar (${hired.length})</h2><div class="grid g3">${hired.map((a) => `<div class="agent-card on">
-      <div class="av">${a.avatar}</div><div style="flex:1"><b>${esc(a.name)}</b><br><small>${esc(a.title)} · ${esc(a.department)}</small><br>${this.statusPill((App.states[a.id] || {}).status)}
-      <div class="row" style="margin-top:6px"><button class="btn sm" onclick="App.openAgent('${a.id}')">Aç / Konuş</button>
-      ${a.id !== "ceo" ? `<button class="btn sec sm" onclick="Views.fire('${a.id}')">Ofisten çıkar</button>` : ""}
-      ${!a.builtin ? `<button class="btn danger sm" onclick="Views.delCustom('${a.id}')">Sil</button>` : ""}</div></div></div>`).join("")}</div></div>`;
+    const groups = {};
+    hired.forEach((a) => (groups[a.instance_of || a.id] ||= []).push(a));
+    el.innerHTML = `<div class="card"><h2>Ofisteki çalışanlar (${hired.length})</h2>
+      <p class="muted">Adları değiştirebilir, her uzmanlıktan kaç kişi çalışacağını − / + ile ayarlayabilirsiniz. Yeni kişiler aynı uzmanlık profiliyle çalışır.</p>
+      <div class="grid g3">${Object.entries(groups).map(([base, list]) => {
+        const b = App.agents.find((x) => x.id === base) || list[0];
+        return `<div class="agent-card on"><div class="av">${b.avatar}</div><div style="flex:1"><b>${esc(b.title)}</b><br><small>${esc(b.department)}</small>
+        <div class="row" style="margin:6px 0">${base === "ceo" ? '<small>CEO tektir</small>' : `<button class="btn sec sm" onclick="Views.setCount('${base}',${list.length - 1})">−</button>
+        <b>${list.length}</b><button class="btn sec sm" onclick="Views.setCount('${base}',${list.length + 1})">+</button><small>kişi</small>`}</div>
+        ${list.map((a) => `<div class="row" style="margin-top:4px"><span>${a.avatar}</span><input id="nm-${a.id}" value="${esc(a.name)}" style="flex:1;padding:5px 8px"
+          onkeydown="if(event.key==='Enter')Views.rename('${a.id}')"><button class="btn sm" title="Adı kaydet" onclick="Views.rename('${a.id}')">✓</button>
+          <button class="btn sec sm" title="Aç / konuş" onclick="App.openAgent('${a.id}')">💬</button>${Views.statusPill((App.states[a.id] || {}).status)}</div>`).join("")}
+        <div class="row" style="margin-top:6px">${!b.builtin && !b.copy ? `<button class="btn danger sm" onclick="Views.delCustom('${b.id}')">Özel ajanı sil</button>` : ""}</div></div></div>`;
+      }).join("")}</div></div>`;
+  },
+  async rename(id) {
+    const v = document.getElementById("nm-" + id).value.trim();
+    if (!v) return toast("Ad boş olamaz.");
+    try { await API.post(`/api/agents/${id}/rename`, { name: v }); toast("Ad kaydedildi: " + v); await App.loadAgents(); }
+    catch (e) { toast(e.message); }
+  },
+  async setCount(id, n) {
+    try { await API.post(`/api/agents/${id}/count`, { count: n }); await App.loadAgents(); App.refresh(); }
+    catch (e) { toast(e.message); }
   },
   async fire(id) { await API.post(`/api/agents/${id}/fire`); await App.loadAgents(); App.refresh(); },
   async hire(id) { await API.post("/api/agents/hire", { ids: [id] }); await App.loadAgents(); App.refresh(); },
@@ -150,12 +169,13 @@ const Views = {
   async market(el) {
     await App.loadAgents();
     const cats = {};
-    App.agents.forEach((a) => (cats[a.category] ||= []).push(a));
+    App.agents.filter((a) => !a.copy).forEach((a) => (cats[a.category] ||= []).push(a));
     const tools = App.meta.tools;
     el.innerHTML = Object.entries(cats).map(([c, list]) => `<div class="card"><h2>${esc(c)}</h2><div class="grid g3">${list.map((a) => `<div class="agent-card ${a.hired ? "on" : ""}">
       <div class="av">${a.avatar}</div><div style="flex:1"><b>${esc(a.title)}</b><br><small>${esc(a.name)}</small><p style="margin:4px 0"><small>${esc(a.duty)}</small></p>
       <small>Araçlar: ${a.tools.map((t) => `<span class="pill">${t}</span>`).join(" ")}</small><br><small>Yetki: ${["", "Okuma", "Düzenleme", "İşlem"][a.permission]}</small>
-      <div style="margin-top:6px">${a.hired ? (a.id === "ceo" ? '<span class="badge ok">Ofiste</span>' : `<button class="btn sec sm" onclick="Views.fire('${a.id}')">Ofisten çıkar</button>`) : `<button class="btn sm" onclick="Views.hire('${a.id}')">+ İşe al</button>`}</div></div></div>`).join("")}</div></div>`).join("") +
+      <div class="row" style="margin-top:6px">${a.id === "ceo" ? '<span class="badge ok">Ofiste (tek)</span>' : a.builtin || !a.copy ? `<button class="btn sec sm" onclick="Views.setCount('${a.id}',${a.team_count - 1})" ${a.team_count ? "" : "disabled"}>−</button>
+        <b>${a.team_count}</b><button class="btn sm" onclick="Views.setCount('${a.id}',${a.team_count + 1})">+</button><small>kişi ofiste</small>` : ""}</div></div></div>`).join("")}</div></div>`).join("") +
       `<div class="card"><h2>➕ Kendi ajanını oluştur</h2><div class="grid g2">
       <div><label>Ad</label><input id="ca_name" placeholder="Örn: Kemal Bey"></div><div><label>Unvan / uzmanlık</label><input id="ca_title" placeholder="Örn: Savunma Sanayi Analisti"></div>
       <div><label>Uzmanlık alanı</label><input id="ca_exp" placeholder="Hava savunma sistemleri, teknik literatür"></div><div><label>Avatar (emoji)</label><input id="ca_av" value="🧑‍🔬"></div>
@@ -235,11 +255,20 @@ const Views = {
   async shareMem(id, v) { await API.put(`/api/memory/${id}`, { shared: v }); this.memory(document.getElementById("view")); },
   async delMem(id) { if (confirm("Silinsin mi?")) { await API.del(`/api/memory/${id}`); this.memory(document.getElementById("view")); } },
   async kb(el) {
-    setTimeout(() => this.embStatus(), 50);
+    setTimeout(() => { this.embStatus(); this.loadSources(); }, 50);
     const r = await API.get("/api/kb");
     el.innerHTML = `<div class="card"><h2>Bilgi Bankası</h2><p>Belgeleri ekleyin (PDF, DOCX, XLSX, PPTX, TXT, MD, HTML). Metin çıkarılır, parçalara ayrılır ve <b>internetsiz</b> anahtar kelime aramasıyla ajanlara kaynak olarak sunulur.</p>
       <div id="embBox" class="msg">Anlamsal arama durumu yükleniyor…</div>
       <div class="row"><input id="kbp" placeholder="Dosya veya klasör yolu (izinli klasörlerde)"><button class="btn sec" onclick="Views.pick('kbp')">Klasör seç</button><button class="btn" onclick="Views.kbAdd()">Ekle</button><button class="btn sec" onclick="Views.kbRefresh()">Güncellemeleri kontrol et</button></div></div>
+      <div class="card"><h2>🌐 İnternet kaynaklarım</h2>
+      <p>Ajanların özellikle bakmasını istediğiniz siteleri ekleyin. <b>Öncelikli</b> kaynaklar web aramalarında önce aranır ve ajanlara listelenir;
+      <b>içeriği eklenen</b> kaynaklar indirilip bilgi bankasına kaydedilir (internet yokken de aranabilir).</p>
+      <textarea id="srcUrls" rows="3" placeholder="Her satıra bir adres. İsterseniz ad da verin:\nTÜBİTAK | https://www.tubitak.gov.tr\nhttps://dergipark.org.tr\nhttps://www.ssb.gov.tr/haberler"></textarea>
+      <div class="row" style="margin-top:6px"><label class="row"><input type="checkbox" id="srcPrio" checked style="width:auto"> Ajanlar önce buraya baksın</label>
+      <label class="row"><input type="checkbox" id="srcIdx" checked style="width:auto"> İçeriği indir ve bilgi bankasına ekle</label>
+      <label class="row">Sayfa sayısı <select id="srcPages" style="width:auto">${[1, 5, 10, 20, 30].map((n) => `<option value="${n}">${n === 1 ? "sadece bu sayfa" : n + " sayfa (aynı siteden)"}</option>`).join("")}</select></label>
+      <button class="btn" onclick="Views.addSources(this)">Kaynak ekle</button></div>
+      <div id="srcList" style="margin-top:10px">Yükleniyor…</div></div>
       <div class="card"><div class="row"><input id="kbq" placeholder="Bilgi bankasında ara…" onkeydown="if(event.key==='Enter')Views.kbSearch()"><button class="btn" onclick="Views.kbSearch()">Ara</button></div><div id="kbHits"></div></div>
       <div class="card"><h3>Belgeler (${r.docs.length})</h3><table><tr><th>Belge</th><th>Parça</th><th>Eklenme</th><th></th></tr>${r.docs.map((d) => `<tr><td>${esc(d.title)}<br><small>${esc(d.path)}</small></td><td>${d.chunks}</td><td>${fmtTime(d.added)}</td><td><button class="btn danger sm" onclick="Views.kbDel(${d.id})">Kaldır</button></td></tr>`).join("")}</table></div>`;
   },
@@ -254,6 +283,32 @@ const Views = {
   },
   async embDl() { const r = await API.post("/api/embeddings/download"); toast("İndirme başladı."); WS.on("job", (m) => { if (m.job.id === r.job.id) { const el = document.getElementById("embJob"); if (el) el.textContent = m.job.status === "çalışıyor" ? `%${m.job.total ? Math.round(m.job.done / m.job.total * 100) : 0}` : m.job.status + (m.job.error ? ": " + m.job.error : ""); if (m.job.status === "tamamlandı") this.embStatus(); } }); },
   async embIndex() { toast("İndeksleniyor…"); try { const r = await API.post("/api/embeddings/index"); toast(r.indexed + " parça indekslendi."); this.embStatus(); } catch (e) { toast(e.message); } },
+  async loadSources() {
+    const el = document.getElementById("srcList"); if (!el) return;
+    const r = await API.get("/api/kb/sources");
+    el.innerHTML = r.sources.length ? `<table><tr><th>Kaynak</th><th>Öncelikli</th><th>Bilgi bankasında</th><th>Durum</th><th></th></tr>${r.sources.map((x) => `<tr>
+      <td><b>${esc(x.title)}</b><br><a href="${esc(x.url)}" target="_blank"><small>${esc(x.url)}</small></a></td>
+      <td><input type="checkbox" style="width:auto" ${x.priority ? "checked" : ""} onchange="Views.srcSet(${x.id},{priority:this.checked?1:0})"></td>
+      <td>${x.indexed ? `${x.pages.length} sayfa` : "—"}</td><td><small>${esc(x.status || "")}${x.last_fetched ? "<br>" + fmtTime(x.last_fetched) : ""}</small></td>
+      <td><button class="btn sec sm" onclick="Views.srcRefresh(${x.id},this)">Yenile</button> <button class="btn danger sm" onclick="Views.srcDel(${x.id})">Sil</button></td></tr>`).join("")}</table>`
+      : "<small>Henüz kaynak eklenmedi.</small>";
+  },
+  async addSources(btn) {
+    const urls = document.getElementById("srcUrls").value.trim();
+    if (!urls) return toast("En az bir adres yazın.");
+    btn.disabled = true; btn.textContent = "Ekleniyor… (sayfalar indiriliyor)";
+    try {
+      const r = await API.post("/api/kb/sources", { urls, priority: document.getElementById("srcPrio").checked,
+        index: document.getElementById("srcIdx").checked, max_pages: +document.getElementById("srcPages").value });
+      toast(`${r.ids.length} kaynak eklendi.` + (r.results.length ? " " + r.results.map((x) => x.status).join(" · ") : ""), 7000);
+      document.getElementById("srcUrls").value = "";
+    } catch (e) { toast(e.message, 6000); }
+    btn.disabled = false; btn.textContent = "Kaynak ekle";
+    this.kb(document.getElementById("view"));
+  },
+  async srcSet(id, data) { await API.put(`/api/kb/sources/${id}`, data); toast("Kaydedildi."); },
+  async srcRefresh(id, btn) { btn.disabled = true; btn.textContent = "…"; const r = await API.post(`/api/kb/sources/${id}/refresh`); toast(r.status); this.loadSources(); },
+  async srcDel(id) { if (!confirm("Kaynak ve bilgi bankasındaki sayfaları silinsin mi?")) return; await API.del(`/api/kb/sources/${id}`); this.kb(document.getElementById("view")); },
   async kbAdd() { try { const r = await API.post("/api/kb/add", { path: document.getElementById("kbp").value }); toast(`${r.added.length} belge eklendi${r.errors.length ? ", " + r.errors.length + " hata" : ""}.`); this.kb(document.getElementById("view")); } catch (e) { toast(e.message, 6000); } },
   async kbRefresh() { const r = await API.post("/api/kb/refresh"); toast(`${r.updated.length} belge güncellendi.`); },
   async kbSearch() { const r = await API.get("/api/kb/search?q=" + encodeURIComponent(document.getElementById("kbq").value)); document.getElementById("kbHits").innerHTML = r.hits.map((h) => `<div class="msg"><div class="who">📄 ${esc(h.title)} – bölüm ${h.chunk_no + 1} <span class="pill">${esc(h.method || "")}${h.score ? " · " + h.score : ""}</span></div>${esc(h.content.slice(0, 500))}</div>`).join("") || "<small>Sonuç yok</small>"; },

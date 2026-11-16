@@ -19,14 +19,14 @@ const Wizard = {
   async next() {
     const name = this.steps[this.step];
     if (name === "team") {
-      await API.post("/api/agents/team", { ids: this.data.team });
+      await this.saveTeam();
     }
     if (this.step >= this.steps.length - 1) return this.finish();
     this.step++;
     this.render();
   },
   async finish() {
-    const r = await API.post("/api/setup/complete", { mode: this.data.mode, hired_agents: this.newMachine ? [] : this.data.team });
+    const r = await API.post("/api/setup/complete", { mode: this.data.mode, hired_agents: [] });
     document.getElementById("wizard").classList.add("hidden");
     toast(r.message);
     App.boot();
@@ -80,7 +80,12 @@ const Wizard = {
       <p>Motor: <b>llama.cpp</b> (paket içinde, kurulum ve yönetici yetkisi gerektirmez). Bilgisayarda <b>Ollama</b> kuruluysa o da otomatik kullanılabilir.</p>
       <div class="row">${eng.vulkan ? '<span class="badge ok">Vulkan GPU motoru pakette</span>' : '<span class="badge warn">Vulkan motoru yok</span>'}
         ${eng.cpu ? '<span class="badge ok">CPU motoru pakette</span>' : '<span class="badge warn">CPU motoru yok</span>'}
-        ${!eng.vulkan || !eng.cpu ? '<button class="btn sm" onclick="Wizard.dlEngine()">Motoru indir (~60 MB)</button>' : ""}<span id="job-engine"></span></div>
+        ${!eng.vulkan || !eng.cpu ? '<button class="btn sm" onclick="Wizard.dlEngine()">Motoru indir (~60 MB)</button> <button class="btn sec sm" onclick="Wizard.scanEngine()">Klasörleri tara</button>' : ""}<span id="job-engine"></span></div>
+      ${!eng.vulkan && !eng.cpu ? `<details class="msg" style="margin-top:8px"><summary><b>Motor inmiyorsa: elle kurulum (2 dakika)</b></summary>
+        <ol><li><a href="${esc(r.releases_page)}" target="_blank">${esc(r.releases_page)}</a> sayfasını açın.</li>
+        <li>En üstteki sürümde <b>Assets</b> bölümünü açın (gerekirse "Show all assets").</li>
+        <li><code>llama-bXXXX-bin-win-vulkan-x64.zip</code> (ekran kartı için) ve <code>llama-bXXXX-bin-win-cpu-x64.zip</code> dosyalarını indirin. Sürümde yoksa bir alttaki sürüme bakın.</li>
+        <li>Dosyaları <b>İndirilenler</b> klasöründe bırakın (açmanıza gerek yok) ve <b>Klasörleri tara</b>'ya basın.</li></ol></details>` : ""}
       <h3 style="margin-top:14px">Model konumu</h3><div class="row" style="gap:18px">${lc("usb", "USB üzerinde (tam taşınabilir)")}${lc("local", "Bu bilgisayarda (hızlı, az USB alanı)")}${lc("hybrid", "Karma (küçük model USB'de, büyük bilgisayarda)")}</div>
       <table style="margin-top:10px"><tr><th>Model</th><th>Dosya</th><th>RAM ihtiyacı</th><th>Disk</th><th></th></tr>${rows}</table>
       <div class="row" style="margin-top:10px"><button class="btn navy" onclick="Wizard.testEngine()">Motoru başlat ve test et</button><span id="engTest">${st.status === "hazir" ? '<span class="badge ok">Motor hazır: ' + esc(st.model_name) + "</span>" : ""}</span></div>
@@ -102,6 +107,11 @@ const Wizard = {
         `<div class="bar" style="width:140px"><i style="width:${pct}%"></i></div><small>${fmtBytes(j.done)} / ${fmtBytes(j.total)} (%${pct})</small>`;
       if (j.status === "tamamlandı" && this.steps[this.step] === "engine") setTimeout(() => this.render(), 800);
     });
+  },
+  async scanEngine() {
+    const r = await API.post("/api/engine/scan");
+    toast(r.found.length ? "Motor bulundu ve kuruldu: " + r.found.join(", ") : "İndirilenler/engines klasöründe llama.cpp ZIP'i bulunamadı.", 6000);
+    this.render();
   },
   async testEngine() {
     const el = document.getElementById("engTest");
@@ -125,23 +135,56 @@ const Wizard = {
   },
   async r_team() {
     const r = await API.get("/api/agents");
-    if (!this.data.team.length) this.data.team = r.recommended.slice();
+    const builtins = r.agents.filter((a) => a.builtin);
+    if (!this.data.counts) {
+      this.data.counts = {};
+      this.data.names = {};
+      builtins.forEach((a) => {
+        this.data.counts[a.id] = r.recommended.includes(a.id) ? 1 : 0;
+        this.data.names[a.id] = [a.name];
+      });
+      this.data.counts.ceo = 1;
+    }
     const byCat = {};
-    r.agents.filter((a) => a.builtin).forEach((a) => (byCat[a.category] ||= []).push(a));
+    builtins.forEach((a) => (byCat[a.category] ||= []).push(a));
+    const total = Object.values(this.data.counts).reduce((x, y) => x + y, 0);
     const html = Object.entries(byCat).map(([cat, list]) => `<h3>${esc(cat)}</h3><div class="grid g3">${list.map((a) => {
-      const on = this.data.team.includes(a.id);
-      return `<div class="agent-card ${on ? "on" : ""}" onclick="Wizard.toggle('${a.id}')"><div class="av">${a.avatar}</div><div><b>${esc(a.title)}</b><br><small>${esc(a.name)} · ${esc(a.expertise)}</small></div></div>`;
+      const n = this.data.counts[a.id] || 0;
+      const names = this.data.names[a.id] || [];
+      const inputs = Array.from({ length: n }, (_, i) => `<input class="nm-in" value="${esc(names[i] || "")}" placeholder="${i + 1}. kişinin adı"
+        oninput="Wizard.setName('${a.id}',${i},this.value)" style="margin-top:4px;padding:5px 8px">`).join("");
+      return `<div class="agent-card ${n ? "on" : ""}"><div class="av">${a.avatar}</div><div style="flex:1"><b>${esc(a.title)}</b><br><small>${esc(a.expertise)}</small>
+        <div class="row" style="margin-top:6px"><button class="btn sec sm" onclick="Wizard.count('${a.id}',-1)" ${a.id === "ceo" ? "disabled" : ""}>−</button>
+        <b style="min-width:24px;text-align:center">${n}</b><button class="btn sec sm" onclick="Wizard.count('${a.id}',1)" ${a.id === "ceo" ? "disabled" : ""}>+</button><small>kişi</small></div>${inputs}</div></div>`;
     }).join("")}</div>`).join("");
-    this.frame(`<h1>🏢 Dijital ofisinizi oluşturun</h1><p>Çalışanlarınızı seçin (${this.data.team.length} seçili). CEO her zaman ofistedir. Ajan sayısı modeli büyütmez: hepsi aynı yerel modeli sırayla kullanır.</p>
-      <div class="row"><button class="btn sec sm" onclick="Wizard.data.team=${JSON.stringify(r.recommended).replace(/"/g, "'")};Wizard.render()">Önerilen ekip</button>
-      <button class="btn sec sm" onclick="Wizard.data.team=${JSON.stringify(r.agents.filter((a) => a.builtin).map((a) => a.id)).replace(/"/g, "'")};Wizard.render()">Hepsini seç</button></div>${html}`);
+    this.frame(`<h1>🏢 Dijital ofisinizi oluşturun</h1>
+      <p>Her uzmanlıktan kaç kişi çalışacağını ve adlarını siz belirleyin (toplam <b>${total}</b> çalışan). CEO tektir.
+      Kişi sayısı modeli büyütmez: hepsi aynı yerel modeli sırayla kullanır; aynı uzmanlıktan birden fazla kişi varsa CEO işi aralarında bölüştürür.</p>
+      <div class="row"><button class="btn sec sm" onclick="Wizard.preset('rec')">Önerilen ekip</button><button class="btn sec sm" onclick="Wizard.preset('all')">Her uzmanlıktan 1 kişi</button>
+      <button class="btn sec sm" onclick="Wizard.preset('none')">Sadece CEO</button></div>${html}`);
   },
-  toggle(id) {
-    if (id === "ceo") return toast("CEO her zaman ofiste.");
-    const t = this.data.team;
-    const i = t.indexOf(id);
-    i >= 0 ? t.splice(i, 1) : t.push(id);
+  count(id, d) {
+    const n = Math.max(0, Math.min(10, (this.data.counts[id] || 0) + d));
+    this.data.counts[id] = n;
+    const names = (this.data.names[id] ||= []);
+    while (names.length < n) names.push("");
     this.render();
+  },
+  setName(id, i, v) { (this.data.names[id] ||= [])[i] = v; },
+  async preset(kind) {
+    const r = await API.get("/api/agents");
+    r.agents.filter((a) => a.builtin).forEach((a) => {
+      this.data.counts[a.id] = a.id === "ceo" ? 1 : kind === "all" ? 1 : kind === "rec" && r.recommended.includes(a.id) ? 1 : 0;
+    });
+    this.render();
+  },
+  async saveTeam() {
+    const ids = Object.keys(this.data.counts).filter((k) => this.data.counts[k] > 0);
+    await API.post("/api/agents/team", { ids });
+    for (const [id, n] of Object.entries(this.data.counts)) {
+      const names = (this.data.names[id] || []).slice(0, n).map((x) => (x || "").trim());
+      await API.post(`/api/agents/${id}/count`, { count: n, names: names.some((x) => x) ? names : [] });
+    }
   },
   async r_test() {
     this.frame(`<h1>🧪 Sistem testi</h1><p class="muted">Servisler ve modüller test ediliyor… (model yükleme birkaç dakika sürebilir)</p>`, { nextDisabled: true });

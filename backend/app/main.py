@@ -125,7 +125,7 @@ async def models():
     hw = machine.get("hardware") or await asyncio.to_thread(detect)
     return ok(models=mm.list_models(hw), recommendation=mm.recommend(hw), embedding=mm.CATALOG["embedding"],
               engine_files={"vulkan": bool(mm.find_server("vulkan")), "cpu": bool(mm.find_server("cpu"))},
-              jobs=[mm.job_public(j) for j in mm.jobs.values()])
+              releases_page=mm.LLAMA_RELEASES_PAGE, jobs=[mm.job_public(j) for j in mm.jobs.values()])
 
 
 class DownloadReq(BaseModel):
@@ -153,6 +153,13 @@ async def model_select(req: DownloadReq):
 @app.post("/api/engine/download")
 async def engine_download():
     return ok(job=mm.start_engine_download())
+
+
+@app.post("/api/engine/scan")
+async def engine_scan():
+    found = await asyncio.to_thread(mm.import_local_engines)
+    return ok(found=found, engine_files={"vulkan": bool(mm.find_server("vulkan")), "cpu": bool(mm.find_server("cpu"))},
+              releases_page=mm.LLAMA_RELEASES_PAGE)
 
 
 @app.post("/api/jobs/{jid}/cancel")
@@ -304,6 +311,38 @@ async def agents_hire(req: IdsReq):
 @app.post("/api/agents/team")
 async def agents_team(req: IdsReq):
     return ok(hired=registry.set_team(req.ids))
+
+
+class RenameReq(BaseModel):
+    name: str
+    avatar: str | None = None
+
+
+@app.post("/api/agents/{agent_id}/rename")
+async def agents_rename(agent_id: str, req: RenameReq):
+    try:
+        a = registry.rename(agent_id, req.name, req.avatar)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await bus.emit("agents_changed")
+    return ok(agent=a)
+
+
+class CountReq(BaseModel):
+    count: int
+    names: list[str] = []
+
+
+@app.post("/api/agents/{agent_id}/count")
+async def agents_count(agent_id: str, req: CountReq):
+    try:
+        members = registry.set_count(agent_id, req.count, req.names)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    for a in members:
+        bus.agent_state.setdefault(a["id"], {"status": "Müsait", "zone": "desk", "bubble": ""})
+    await bus.emit("agents_changed")
+    return ok(members=members)
 
 
 @app.post("/api/agents/{agent_id}/fire")
@@ -464,6 +503,62 @@ async def kb_add(req: PathReq):
         except Exception as e:  # noqa
             errors.append(f"{f.name}: {e}")
     return ok(added=added, errors=errors)
+
+
+class SourceReq(BaseModel):
+    urls: str
+    title: str = ""
+    priority: bool = True
+    index: bool = True
+    max_pages: int = 1
+
+
+@app.get("/api/kb/sources")
+async def kb_sources():
+    from . import websources
+    return ok(sources=websources.list_sources())
+
+
+@app.post("/api/kb/sources")
+async def kb_sources_add(req: SourceReq):
+    from . import websources
+    try:
+        ids = websources.add_sources(req.urls, req.title, req.priority, req.index, req.max_pages)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    results = []
+    if req.index:
+        if not get_settings().get("internet_enabled", True):
+            raise HTTPException(400, "İnternet erişimi kapalı; kaynak eklendi ama içeriği indirilemedi.")
+        for i in ids:
+            try:
+                results.append(await websources.index_source(i))
+            except Exception as e:  # noqa
+                results.append({"id": i, "status": f"Hata: {e}"})
+    return ok(ids=ids, results=results)
+
+
+@app.post("/api/kb/sources/{sid}/refresh")
+async def kb_source_refresh(sid: int):
+    from . import websources
+    try:
+        return ok(**await websources.index_source(sid))
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.put("/api/kb/sources/{sid}")
+async def kb_source_update(sid: int, data: dict):
+    from . import websources
+    websources.update_source(sid, **data)
+    return ok()
+
+
+@app.delete("/api/kb/sources/{sid}")
+async def kb_source_delete(sid: int):
+    from . import websources
+    websources.delete_source(sid)
+    return ok()
 
 
 @app.post("/api/kb/refresh")
