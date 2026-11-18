@@ -9,7 +9,8 @@ on:
         default: none
         options: [none, qwen2.5-1.5b, qwen2.5-3b]
   push:
-    tags: ["v*"]
+    branches: ["**"]
+    paths: ["AI_OFFICE_KAYNAK.zip"]   # ZIP yuklenince paketleme kendiliginden baslar
 
 jobs:
   build:
@@ -18,9 +19,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Tek ZIP olarak yuklenen kaynagi ac (AI_OFFICE_KAYNAK.zip)
+        shell: pwsh
+        run: |
+          $z = Get-ChildItem -Path . -Filter "AI_OFFICE*.zip" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($z) {
+            Write-Host "ZIP bulundu: $($z.Name) - aciliyor"
+            Expand-Archive $z.FullName -DestinationPath _src -Force
+            $root = if (Test-Path "_src/AI_OFFICE_PORTABLE") { "_src/AI_OFFICE_PORTABLE" } else { "_src" }
+            Get-ChildItem -Force $root | ForEach-Object { Copy-Item -Recurse -Force $_.FullName . }
+            Remove-Item -Recurse -Force _src
+            Get-ChildItem -Force | Select-Object Name
+          } else { Write-Host "ZIP yok; repodaki dosyalar kullaniliyor." }
+
       - name: Paket ici Python ve bagimliliklar
         shell: pwsh
         run: ./installer/prepare_runtime.ps1 -Root "$env:GITHUB_WORKSPACE"
+
+      - name: Guncel Visual C++ calisma zamani (repoda yoksa indir)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dependencies/vcrt/msvcp140.dll")) {
+            New-Item -ItemType Directory -Force dependencies/vcrt, _vc | Out-Null
+            runtime/python/python.exe -m pip download msvc-runtime --no-deps --only-binary=:all: -d _vc
+            $w = Get-ChildItem _vc -Filter *.whl | Select-Object -First 1
+            Copy-Item $w.FullName _vc/w.zip
+            Expand-Archive _vc/w.zip -DestinationPath _vc/x -Force
+            Get-ChildItem _vc/x -Recurse -Filter *.dll | ForEach-Object { Copy-Item $_.FullName dependencies/vcrt/ -Force }
+            Remove-Item -Recurse -Force _vc
+          }
+          Get-ChildItem dependencies/vcrt
 
       - name: llama.cpp motoru (Vulkan + CPU) ve istege bagli model
         shell: pwsh
@@ -63,6 +91,8 @@ jobs:
           Get-ChildItem $out -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
           foreach ($d in "agent_profiles","models","memory","knowledge_base","projects","workspace","database","logs","config","backups","cache","exports","dependencies","tools") { New-Item -ItemType Directory -Force "$out/$d" | Out-Null }
           if (Test-Path dependencies/ms-playwright) { Copy-Item -Recurse -Force dependencies/ms-playwright "$out/dependencies/" }
+          Copy-Item -Recurse -Force dependencies/vcrt "$out/dependencies/"
+          Get-ChildItem engines -Recurse -Filter llama-server.exe | ForEach-Object { Copy-Item dependencies/vcrt/*.dll $_.DirectoryName -Force }
 
       - name: Windows kurulum paketi (Inno Setup, yonetici yetkisi gerektirmez)
         shell: pwsh
