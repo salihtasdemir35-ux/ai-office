@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI OFFICE – Autonomous AI Workforce</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%2314b8a6%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2215%22 text-anchor=%22middle%22 font-family=%22Arial%22 font-weight=%22bold%22 fill=%22%230b1f3a%22%3EAI%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="wizard" class="hidden"></div>
+  <div id="app" class="hidden">
+    <aside id="sidebar">
+      <div class="brand">
+        <div class="logo">AI</div>
+        <div><b>AI OFFICE</b><small>Autonomous AI Workforce</small></div>
+      </div>
+      <nav id="nav"></nav>
+      <div class="side-foot">
+        <div id="engineBadge" class="badge">Motor: —</div>
+        <button class="btn danger block" onclick="safeExit()">⏏ Güvenli Kapat ve Çıkar</button>
+      </div>
+    </aside>
+    <main>
+      <header id="topbar">
+        <button class="icon-btn" id="menuBtn" onclick="document.body.classList.toggle('nav-open')">☰</button>
+        <h1 id="viewTitle">Ana Sayfa</h1>
+        <div class="top-right">
+          <span id="usbBadge" class="badge"></span>
+          <span id="resBadge" class="badge"></span>
+          <button class="btn warn sm" onclick="stopAll()" title="Bütün ajanları ve görevleri durdur">⏹ Tümünü Durdur</button>
+        </div>
+      </header>
+      <section id="view"></section>
+    </main>
+  </div>
+  <div id="drawer" class="drawer hidden"></div>
+  <div id="approvals"></div>
+  <div id="toast"></div>
+  <script src="js/api.js"></script>
+  <script src="js/wizard.js"></script>
+  <script src="js/office.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

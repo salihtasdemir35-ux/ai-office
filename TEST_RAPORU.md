@@ -1,6 +1,6 @@
-# AI OFFICE 1.1 – Test Raporu (14.11.2026)
+# AI OFFICE 1.2 – Test Raporu (14.11.2026)
 
-## Otomatik testler: 34/34 başarılı (Python 3.11 ve 3.13) (`runtime\python\python.exe -m pytest backend/tests`)
+## Otomatik testler: 39/39 başarılı (Python 3.11 ve 3.13) (`runtime\python\python.exe -m pytest backend/tests`)
 Orkestratör ve embedding testleri için YALNIZCA TESTTE OpenAI uyumlu sahte yerel sunucu kullanılır; uygulamada sahte yanıt yoktur.
 
 | Aşama | Test | Sonuç |
@@ -26,6 +26,7 @@ Orkestratör ve embedding testleri için YALNIZCA TESTTE OpenAI uyumlu sahte yer
 | 1.1 | Motor: Windows paketi olmayan 'latest' sürüm atlanır; elle indirilen ZIP otomatik kurulur | ✅ |
 | 1.1 | Ajan kişi sayısı (3 internet araştırmacısı, adlarıyla), yeniden adlandırma, tek CEO, CEO ekip listesinde adlar | ✅ |
 | 1.1 | İnternet kaynakları: alt sayfalarla indirme, bilgi bankasında arama, öncelikli kaynakların CEO/ajan talimatına eklenmesi, yerel adres engeli | ✅ |
+| 1.2 | 0xC0000005 çökmesinde güvenli moda (--no-mmap, GPU'suz) geçip başlama; VC++ DLL kopyalama; eksik model tespiti; tanılama raporu | ✅ |
 | 7 | Kaynak izleme (CPU/RAM/disk/GPU alanı), embedding durumu | ✅ |
 
 ## Arayüz testi (headless Chrome)

@@ -1,5 +1,5 @@
 =====================================================================
-  AI OFFICE – Autonomous AI Workforce            (sürüm 1.1)
+  AI OFFICE – Autonomous AI Workforce            (sürüm 1.2)
   "Ofisini kur. Yapay zekâ çalışanlarını seç. İşlerini yönet."
 =====================================================================
 
@@ -47,6 +47,12 @@ Anlamsal arama modeli (bge-m3, 438 MB, MIT, çok dilli) da paketlemede otomatik 
 - Görev kuyruğu, GPU/CPU/RAM/disk izleme, RAM'e sığmayan modeli otomatik küçültme
 - Yedekleme (şifreli), USB veri kasası, bilgisayarlar arası senkronizasyon (çakışma ekranı),
   model taşıma/silme, "Bilgisayara kur" (kısayollu), Inno Setup kurulum paketi (GitHub Actions)
+
+YENİ (1.2)
+- Motor çökmesi (kod 3221225477 / 0xC0000005) onarıldı: güncel Visual C++ çalışma zamanı (14.44) pakette;
+  motor klasörüne otomatik kopyalanır (yönetici yetkisi gerekmez). Çökerse güvenli mod ve daha küçük model denenir.
+- Eksik inmiş model dosyaları tespit edilir: 'Dosya sorunlu → Yeniden indir'.
+- 🩺 Motor tanılama: motor, VC++, model ve kayıt raporu; 'Raporu kopyala'.
 
 YENİ (1.1)
 - Ajan adlarını ve her uzmanlıktan kaç kişi çalışacağını siz belirlersiniz (Kurulum > Ekip, Ajanlarım, Ajan Marketi).

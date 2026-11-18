@@ -1,0 +1,4 @@
+Microsoft Visual C++ 2015-2022 Redistributable (x64) 14.44.35112 çalışma zamanı DLL'leri.
+Kaynak: PyPI "msvc-runtime" paketi. Microsoft yeniden dağıtım koşullarına göre uygulama yanında (app-local) kullanılır.
+AI OFFICE bu DLL'leri llama.cpp motorunun klasörüne kopyalar; bilgisayardaki eski sürüm yerine bunlar kullanılır.
+Yönetici yetkisi gerektirmez, Windows sistem dosyalarına dokunmaz.

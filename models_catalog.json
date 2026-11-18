@@ -1,0 +1,71 @@
+{
+  "_aciklama": "Yerel GGUF modelleri. Tamamen ücretsiz, API anahtarı gerekmez. URL'ler Hugging Face'ten doğrudan indirme adresidir; dilerseniz bu dosyayı düzenleyerek model ekleyebilirsiniz.",
+  "models": [
+    {
+      "id": "qwen2.5-1.5b",
+      "name": "Qwen2.5 1.5B Instruct (Q4_K_M)",
+      "tier": "cok_dusuk",
+      "file": "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+      "size_gb": 0.99,
+      "ram_gb": 2.5,
+      "ctx": 4096,
+      "ollama": "qwen2.5:1.5b",
+      "license": "Apache-2.0",
+      "turkish": "orta",
+      "note": "4-6 GB RAM'li çok zayıf bilgisayarlar için. Hızlı ama basit."
+    },
+    {
+      "id": "qwen2.5-3b",
+      "name": "Qwen2.5 3B Instruct (Q4_K_M)",
+      "tier": "dusuk",
+      "file": "Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+      "size_gb": 1.93,
+      "ram_gb": 3.5,
+      "ctx": 4096,
+      "ollama": "qwen2.5:3b",
+      "license": "Qwen Research License (kişisel/araştırma kullanımı; ticari kullanım için lisansı okuyun)",
+      "turkish": "iyi",
+      "note": "8 GB RAM'li bilgisayarlar (AMD ekran kartlı sistemler dahil) için önerilen."
+    },
+    {
+      "id": "qwen2.5-7b",
+      "name": "Qwen2.5 7B Instruct (Q4_K_M)",
+      "tier": "dengeli",
+      "file": "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+      "size_gb": 4.68,
+      "ram_gb": 7.0,
+      "ctx": 8192,
+      "ollama": "qwen2.5:7b",
+      "license": "Apache-2.0",
+      "turkish": "çok iyi",
+      "note": "16 GB RAM veya 6 GB+ VRAM için dengeli seçim."
+    },
+    {
+      "id": "qwen2.5-14b",
+      "name": "Qwen2.5 14B Instruct (Q4_K_M)",
+      "tier": "yuksek",
+      "file": "Qwen2.5-14B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
+      "size_gb": 8.99,
+      "ram_gb": 12.0,
+      "ctx": 8192,
+      "ollama": "qwen2.5:14b",
+      "license": "Apache-2.0",
+      "turkish": "çok iyi",
+      "note": "32 GB RAM veya 10 GB+ VRAM için yüksek kalite."
+    }
+  ],
+  "embedding": {
+    "id": "bge-m3",
+    "name": "BGE-M3 (Q4_K_M) – çok dilli (Türkçe) anlamsal arama modeli",
+    "file": "bge-m3-Q4_K_M.gguf",
+    "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-Q4_K_M.gguf",
+    "size_gb": 0.44,
+    "ram_gb": 0.8,
+    "license": "MIT",
+    "ollama": "bge-m3"
+  }
+}
